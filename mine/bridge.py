@@ -1,6 +1,7 @@
 import asyncio
 import inspect
 import itertools
+import sys
 
 from bleak import BleakScanner
 from parser import Parser
@@ -21,6 +22,9 @@ async def scan(args):
                     continue
 
                 data = args.devices[bd.address]['decoder'](bd, ad)
+                if data == None:
+                    continue
+
                 args.devices[bd.address]['outputer'](data)
 
     except KeyboardInterrupt:
