@@ -1,6 +1,7 @@
 import asyncio
 import inspect
 import itertools
+import json
 import sys
 
 from bleak import BleakScanner
@@ -8,9 +9,33 @@ from parser import Parser
 
 import processors
 import output
+import adafruit
 
-decoders = {}
-outputers = {}
+async def collect(args):
+    try:
+        async with BleakScanner() as scanner:
+            print("Collecting...")
+
+            async for bd, ad in scanner.advertisement_data():
+                if not bd.address in args.devices:
+                    continue
+
+                data = args.devices[bd.address]['decoder'](bd, ad)
+                if data == None:
+                    continue
+                args.devices[bd.address]['data'] = data
+
+                #  todo:  we need a timeout
+                if all(map(lambda d: not d.get('data',None) == None, args.devices.values())):
+                    break
+
+            for dev in args.devices.values():
+                dev['outputer'](dev['data'])
+
+    except KeyboardInterrupt:
+        print("Shutting down...")
+    except asyncio.exceptions.CancelledError:
+        print("Shutting down...")
 
 async def scan(args):
     try:
@@ -33,30 +58,33 @@ async def scan(args):
         print("Shutting down...")
 
 def main(args):
-    devices = dict(reversed(item.split(":", 1)) for item in args.devices)
-    devices = dict([addr, { 'decoder': decoders[dev].decode, 'outputer': outputers[dev].print }] for addr,dev in devices.items())
-    args.devices = devices
-
-    asyncio.run(scan(args))
-
-def makedict(module):
-    xxx = map(
-                lambda m: (m[0], m[1][0][0], m[1][0][1]),
-                map(
-                    lambda m: (m[0], inspect.getmembers(m[1], inspect.isclass)),
-                    map(
-                        lambda moduleinfo: moduleinfo,
-                        inspect.getmembers(module, inspect.ismodule)
-                    )
-                )
-            )
-    dict = { mi[0]:mi[2] for mi in xxx }
-    return dict
+    if args.command == 'collect':
+        asyncio.run(collect(args))
+    else:
+        asyncio.run(scan(args))
 
 if __name__ == "__main__":
-    outputers = makedict(output)
-
-    decoders = makedict(processors)
-
     args = Parser.parse()
+    args.devices = dict(
+             map(
+                 lambda m: (
+                     m[0],
+                     {
+                         'addr': m[0],
+                         'type': m[1],
+                         'decoder': processors.members[m[1]].decode,
+                         'outputer': getattr(output.members[m[1]], args.output)
+                     }
+                 ),
+                 map(
+                     lambda m: ( m.split(':',1)[1], m.split(':',1)[0], ),
+                     args.devices
+                 )
+             )
+         )
+    #print(processors.members)
+    #print(output.members)
+    #print(args)
+    #sys.exit()
+
     main(args)

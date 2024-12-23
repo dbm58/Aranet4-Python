@@ -19,3 +19,8 @@ class Lywsd03:
     def print(data):
         print(fmt.format(data=data))
 
+    @staticmethod
+    def line(data):
+        line = f'{data.name:<15} {data.mac:<17}  Temp: {data.temperatureF:.2f} F'
+        print(line)
+

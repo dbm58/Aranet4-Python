@@ -1,3 +1,6 @@
+from .adafruit import send as aio_send
+
+
 fmt = """
 =======================================
   Name:     {advertisement.device.name}
@@ -20,7 +23,26 @@ fmt = """
 #  Status Humid.:  {advertisement.readings.status_h.name}
 
 class Aranet4:
+#   send:  to adafruit
+#   line:  compact; default
+#   print: extended output
+#   raw:   print device and advertisement
+
+    @staticmethod
+    def send(data, sensor = 'co2'):
+        data = {
+            'mac': data.device.address,
+            'sensor': sensor,
+            'value': getattr(data.readings, sensor, None)
+        }
+        aio_send(data)
+
     @staticmethod
     def print(advert):
         print(fmt.format(advertisement=advert))
+
+    @staticmethod
+    def line(advert):
+        line = f'{advert.device.name:<15} {advert.device.address:<17}  Co2:  {advert.readings.co2}'
+        print(line)
 
